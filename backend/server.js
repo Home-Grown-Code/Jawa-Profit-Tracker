@@ -130,6 +130,22 @@ async function updateRowById(id, fields) {
   return { ok: true, row: rowNumber };
 }
 
+function computeRowFields(current, fields) {
+  const qtyPcsN = fields['Qty PCs'] !== undefined ? Number(fields['Qty PCs']) : Number(current['Qty PCs']) || 0;
+  const totalCostN = fields['Total Cost'] !== undefined ? Number(fields['Total Cost']) : Number(current['Total Cost']) || 0;
+  const sellPriceN = fields['Sell Price per PC'] !== undefined ? Number(fields['Sell Price per PC']) : Number(current['Sell Price per PC']) || 0;
+  const pcsSoldN = fields['PCs Sold'] !== undefined ? Number(fields['PCs Sold']) : Number(current['PCs Sold']) || 0;
+
+  fields['Cost per PC'] = qtyPcsN > 0 ? (totalCostN / qtyPcsN).toFixed(2) : current['Cost per PC'];
+  fields['PCs Remaining'] = Math.max(qtyPcsN - pcsSoldN, 0);
+  fields['Revenue'] = (pcsSoldN * sellPriceN).toFixed(2);
+  fields['Profit'] = (pcsSoldN * (sellPriceN - Number(fields['Cost per PC']))).toFixed(2);
+  if (!fields.Status) {
+    fields.Status = qtyPcsN > 0 && fields['PCs Remaining'] <= 0 ? 'Sold Out' : 'Active';
+  }
+  return fields;
+}
+
 // ---------- Routes ----------
 
 app.get('/health', (_req, res) => {
@@ -232,6 +248,56 @@ app.put('/api/sheet/:id', async (req, res, next) => {
 
     await updateRowById(id, fields);
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/api/sheet/batch', async (req, res, next) => {
+  try {
+    const { updates } = req.body || {};
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ ok: false, error: 'No updates provided.' });
+    }
+    const { rows } = await readAllRows();
+    const byId = new Map();
+    rows.forEach((r, i) => byId.set(String(r.ID), { row: r, index: i }));
+
+    const cellUpdates = [];
+    const results = [];
+
+    for (const { id, fields } of updates) {
+      const entry = byId.get(String(id));
+      if (!entry) {
+        results.push({ id, ok: false, error: 'Row not found.' });
+        continue;
+      }
+      const current = entry.row;
+      const merged = { ...current, ...fields };
+      computeRowFields(current, merged);
+
+      let changed = false;
+      COLUMNS.forEach((c) => { if (String(merged[c] !== undefined ? merged[c] : '') !== String(current[c] !== undefined ? current[c] : '')) changed = true; });
+      if (!changed) {
+        results.push({ id, ok: true, skipped: true });
+        continue;
+      }
+      COLUMNS.forEach((c, colIndex) => {
+        cellUpdates.push({
+          range: `${SHEET_NAME}!${columnLetter(colIndex)}${entry.index + 2}`,
+          values: [[String(merged[c] !== undefined ? merged[c] : '')]],
+        });
+      });
+      results.push({ id, ok: true });
+    }
+
+    if (cellUpdates.length) {
+      await sheetsClient().spreadsheets.values.batchUpdate({
+        spreadsheetId: SHEET_ID,
+        resource: { valueInputOption: 'USER_ENTERED', data: cellUpdates },
+      });
+    }
+    res.json({ ok: true, count: results.filter((r) => r.ok).length, results });
   } catch (err) {
     next(err);
   }
