@@ -1,0 +1,19 @@
+{
+  "name": "jawa-profit-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Track items you bought, organize them into pieces (PCs), and sell them individually for profit. Synced to Google Sheets.",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "node backend/server.js"
+  },
+  "dependencies": {
+    "compression": "^1.8.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.5.1",
+    "googleapis": "^144.0.0"
+  }
+}

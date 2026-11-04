@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tracker — Log a Bought Item | Jawa Profit Tracker</title>
+  <meta name="description" content="Submit items you bought to the Jawa Profit Tracker. Record PCs (pieces), cost and sell price; profit is calculated per item and synced to Google Sheets.">
+  <meta name="robots" content="index, follow">
+  <link rel="preload" as="style" href="assets/css/styles.css">
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/images/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand-block" role="button" tabindex="0" aria-label="Return to home" onclick="location.href='index.html'">
+        <div class="brand-title">Jawa Profit Tracker</div>
+      </div>
+      <nav class="tabs" aria-label="Pages">
+        <a href="index.html">Home</a>
+        <a href="tracker.html" class="tab-btn active">Tracker</a>
+        <a href="sheet.html">Sheet</a>
+        <a href="guide.html">Guide</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="eyebrow">Tracker &middot; Jawa Profit Tracker</div>
+      <h1>Log a bought item</h1>
+      <p>Record a purchase you made. The tracker figures out the cost per PC (piece) and your projected profit as you sell them one by one.</p>
+
+      <div id="trackerStatus" class="status hidden"></div>
+
+      <form id="trackerForm" novalidate>
+        <div>
+          <label for="item">Item name</label>
+          <input id="item" type="text" placeholder="e.g. Bulk lot of vintage figures" required>
+        </div>
+        <div>
+          <label for="store">Store / source</label>
+          <input id="store" type="text" placeholder="e.g. eBay, flea market, wholesaler">
+        </div>
+        <div>
+          <label for="totalCost">Total cost (&pound;)</label>
+          <input id="totalCost" type="number" min="0" step="0.01" placeholder="0.00" required>
+        </div>
+        <div>
+          <label for="qtyPcs">Qty PCs (pieces bought)</label>
+          <input id="qtyPcs" type="number" min="0" step="1" placeholder="1" required>
+        </div>
+        <div>
+          <label for="sellPrice">Sell price per PC (&pound;)</label>
+          <input id="sellPrice" type="number" min="0" step="0.01" placeholder="0.00" required>
+        </div>
+        <div>
+          <label for="pcsSold">PCs already sold</label>
+          <input id="pcsSold" type="number" min="0" step="1" value="0">
+        </div>
+        <div class="form-row">
+          <label for="status">Status</label>
+          <select id="status">
+            <option value="Active">Active</option>
+            <option value="Sold Out">Sold Out</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="notes">Notes</label>
+          <textarea id="notes" rows="2" placeholder="Any details&hellip;"></textarea>
+        </div>
+        <div class="calc-line" id="calcLine" style="display:none;">
+          <b id="calcText">Cost per PC: &mdash; &nbsp;|&nbsp; Projected revenue: &mdash; &nbsp;|&nbsp; Projected profit: &mdash;</b>
+        </div>
+
+        <div class="form-row" style="margin-top:8px;">
+          <button type="submit" id="submitBtn" class="primary">Save to sheet</button>
+          <button type="button" id="resetBtn" class="secondary">Reset</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <footer id="siteFooter" class="panel">
+    <h2>Jawa Profit Tracker</h2>
+    <p>Track items you bought, organize them into PCs, sell individually &mdash; profit tracked per row, synced to Google Sheets.</p>
+    <nav class="footer-links" aria-label="Footer navigation">
+      <a href="index.html">Home</a>
+      <a href="tracker.html">Tracker</a>
+      <a href="sheet.html">Sheet</a>
+      <a href="guide.html">Guide</a>
+    </nav>
+  </footer>
+
+  <div id="toast-container"></div>
+  <script defer src="assets/js/app.js"></script>
+  <script defer>
+    (() => {
+      const itemEl = $('item');
+      const storeEl = $('store');
+      const totalCostEl = $('totalCost');
+      const qtyPcsEl = $('qtyPcs');
+      const sellPriceEl = $('sellPrice');
+      const pcsSoldEl = $('pcsSold');
+      const statusEl = $('status');
+      const notesEl = $('notes');
+      const calcLine = $('#calcLine');
+      const calcText = $('#calcText');
+      const form = $('#trackerForm');
+      const submitBtn = $('#submitBtn');
+      const statusBox = $('#trackerStatus');
+
+      function updateCalc() {
+        const totalCost = Number(totalCostEl.value) || 0;
+        const qty = Number(qtyPcsEl.value) || 0;
+        const sell = Number(sellPriceEl.value) || 0;
+        const sold = Number(pcsSoldEl.value) || 0;
+        if (!itemEl.value && !storeEl.value && totalCost === 0 && qty === 0 && sell === 0) {
+          calcLine.style.display = 'none';
+          return;
+        }
+        const costPerPc = qty > 0 ? (totalCost / qty).toFixed(2) : '0.00';
+        const remaining = Math.max(qty - sold, 0);
+        const revenue = (sold * sell).toFixed(2);
+        const profit = (sold * (sell - Number(costPerPc))).toFixed(2);
+        calcText.textContent =
+          'Cost per PC: &pound;' + costPerPc + ' &nbsp;|&nbsp; Projected revenue: &pound;' + revenue + ' &nbsp;|&nbsp; Projected profit: &pound;' + profit + ' &nbsp;|&nbsp; PCs remaining: ' + remaining;
+        calcLine.style.display = '';
+      }
+
+      [itemEl, storeEl, totalCostEl, qtyPcsEl, sellPriceEl, pcsSoldEl].forEach((el) => {
+        el.addEventListener('input', updateCalc);
+      });
+      updateCalc();
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!navigator.onLine) {
+          showToast('You appear offline. Entry will queue and sync when you reconnect.', 'warn');
+        }
+        submitBtn.textContent = 'Saving&hellip;';
+        submitBtn.disabled = true;
+        statusBox.className = 'status hidden';
+        try {
+          const res = await fetch(`${API_BASE}/sheet`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              item: itemEl.value.trim(),
+              store: storeEl.value.trim(),
+              totalCost: totalCostEl.value,
+              qtyPcs: qtyPcsEl.value,
+              sellPrice: sellPriceEl.value,
+              pcsSold: pcsSoldEl.value || 0,
+              status: statusEl.value,
+              notes: notesEl.value.trim(),
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || data.ok === false) throw new Error(data.error || 'Save failed (HTTP ' + res.status + ')');
+          statusBox.className = 'status ok';
+          statusBox.textContent = 'Saved to your Google Sheet.';
+          showToast('Item saved to sheet.', 'ok');
+          form.reset();
+          pcsSoldEl.value = 0;
+          statusEl.value = 'Active';
+          updateCalc();
+        } catch (err) {
+          statusBox.className = 'status error';
+          statusBox.textContent = err.message || 'Save failed.';
+          showToast(err.message || 'Save failed.', 'error');
+          console.error(err);
+        } finally {
+          submitBtn.textContent = 'Save to sheet';
+          submitBtn.disabled = false;
+        }
+      });
+
+      $('#resetBtn').addEventListener('click', () => {
+        form.reset();
+        pcsSoldEl.value = 0;
+        statusEl.value = 'Active';
+        updateCalc();
+        statusBox.className = 'status hidden';
+      });
+    })();
+  </script>
+</body>
+</html>
+

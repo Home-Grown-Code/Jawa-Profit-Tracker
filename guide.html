@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guide — Set up Jawa Profit Tracker</title>
+  <meta name="description" content="Set up the Jawa Profit Tracker: Google Sheets service account, Render backend, GitHub Pages frontend. Track bought items, PCs and individual sales.">
+  <meta name="robots" content="index, follow">
+  <link rel="preload" as="style" href="assets/css/styles.css">
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/images/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand-block" role="button" tabindex="0" aria-label="Return to home" onclick="location.href='index.html'">
+        <div class="brand-title">Jawa Profit Tracker</div>
+      </div>
+      <nav class="tabs" aria-label="Pages">
+        <a href="index.html">Home</a>
+        <a href="tracker.html">Tracker</a>
+        <a href="sheet.html">Sheet</a>
+        <a href="guide.html" class="tab-btn active">Guide</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="eyebrow">Guide &middot; Jawa Profit Tracker</div>
+      <h1>Set up your profit tracker</h1>
+      <p>The tracker has two parts: a static website (GitHub Pages) and a small Node.js backend (Render) that reads/writes your Google Sheet using a service account &mdash; you never share your Google password.</p>
+
+      <h2>Step 1 &mdash; Prepare your Google Sheet</h2>
+      <ol class="guide-steps">
+        <li>Open <code>sheets.new</code> and create a blank spreadsheet.</li>
+        <li>On the first row (tab <b>Jawa Profit</b>, or whatever you set as <code>SHEET_NAME</code>), add these headers exactly:</li>
+      </ol>
+      <pre style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;overflow:auto;font-size:0.85rem;">
+ID, Date, Item, Store, Total Cost, Qty PCs, Cost per PC, Sell Price per PC, PCs Sold, PCs Remaining, Revenue, Profit, Status, Notes
+      </pre>
+      <li>Copy the <b>Sheet ID</b>: it's the long string between <code>/d/</code> and <code>/edit</code> in your sheet URL.</li>
+    </section>
+
+    <section class="panel">
+      <h2>Step 2 &mdash; Create a service account</h2>
+      <ol class="guide-steps">
+        <li>Go to the <b>Google Cloud Console</b>, create or pick a project, and enable the <b>Google Sheets API</b>.</li>
+        <li>Go to <b>IAM &amp; Admin &rarr; Service Accounts</b> and create a service account.</li>
+        <li>Create a JSON key for it and download the file. Open it &mdash; you need <code>client_email</code> and <code>private_key</code>.</li>
+        <li><b>Share your Google Sheet</b> with that <code>client_email</code> as an <b>Editor</b>. This is the only permission needed.</li>
+      </ol>
+    </section>
+    <section class="panel">
+      <h2>Step 3 &mdash; Deploy the backend on Render</h2>
+      <ol class="guide-steps">
+        <li>Push this repo to GitHub (see <a href="https://github.com/Home-Grown-Code/Jawa-Profit-Tracker">Home-Grown-Code/Jawa-Profit-Tracker</a>).</li>
+        <li>In <b>Render</b>, create a new <b>Web Service</b> and connect this repo (or use the included <code>render.yaml</code>).</li>
+        <li>Set these <b>Environment Variables</b> on Render (do not commit real values):</li>
+      </ol>
+      <ul>
+        <li><code>GOOGLE_SHEET_ID</code> &mdash; your Sheet ID from Step 1</li>
+        <li><code>GOOGLE_SERVICE_ACCOUNT_EMAIL</code> &mdash; the service account <code>client_email</code></li>
+        <li><code>GOOGLE_PRIVATE_KEY</code> &mdash; the full private key from the JSON key (keep the <code>\n</code> escapes)</li>
+        <li><code>SHEET_NAME</code> &mdash; e.g. <code>Jawa Profit</code> (default)</li>
+        <li><code>PORT</code> &mdash; <code>3001</code></li>
+      </ul>
+      <li>Note your Render service URL, e.g. <code>https://jawa-profit-tracker.onrender.com</code>.</li>
+      <li>Check it&rsquo;s running: open <code>&lt;your-render-url&gt;/health</code> &mdash; you should see <code>{"ok":true}</code>.</li>
+    </section>
+
+    <section class="panel">
+      <h2>Step 4 &mdash; Point the website at your backend</h2>
+      <p>Open <code>assets/js/app.js</code> and set <code>API_BASE</code> to your Render URL, e.g.:</p>
+      <pre style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;overflow:auto;font-size:0.85rem;">
+const API_BASE = 'https://jawa-profit-tracker.onrender.com/api';
+      </pre>
+      <p>Commit and push. GitHub Pages will redeploy the static site automatically.</p>
+      <p>For local development, leave <code>API_BASE</code> as <code>http://localhost:3001/api</code> and run <code>npm start</code> in this folder.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Using the tracker</h2>
+      <ul class="feature-list">
+        <li><b>Tracker</b> tab &mdash; add an item you bought, its total cost, how many PCs (pieces), and your sell price per piece.</li>
+        <li><b>Sheet</b> tab &mdash; edit PCs Sold, Status and Notes per row; profit and PCs remaining recalculate and write back to your Google Sheet.</li>
+        <li><b>Home</b> tab &mdash; overview of how it works.</li>
+      </ul>
+      <p class="hint">Entries are appended as rows in your Google Sheet. Offline saves queue and sync when you&rsquo;re back online.</p>
+    </section>
+  </main>
+
+  <footer id="siteFooter" class="panel">
+    <h2>Jawa Profit Tracker</h2>
+    <p>Track items you bought, organize them into PCs, sell individually &mdash; profit tracked per row, synced to Google Sheets.</p>
+    <nav class="footer-links" aria-label="Footer navigation">
+      <a href="index.html">Home</a>
+      <a href="tracker.html">Tracker</a>
+      <a href="sheet.html">Sheet</a>
+      <a href="guide.html">Guide</a>
+      <a href="https://github.com/Home-Grown-Code/Jawa-Profit-Tracker">GitHub Repository</a>
+    </nav>
+  </footer>
+
+  <div id="toast-container"></div>
+  <script defer src="assets/js/app.js"></script>
+</body>
+</html>
+

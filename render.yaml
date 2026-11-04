@@ -1,0 +1,21 @@
+# Render.com deployment for the Jawa Profit Tracker backend.
+# Create a "Web Service" on Render and connect this repo, or paste this file
+# at the repo root and Render will detect it automatically.
+services:
+  - type: web
+    name: jawa-profit-tracker
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: SHEET_NAME
+        value: Jawa Profit
+      # Fill these in on Render (Environment tab) — do not commit real values:
+      - key: GOOGLE_SHEET_ID
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+        sync: false
+      - key: GOOGLE_PRIVATE_KEY
+        sync: false
