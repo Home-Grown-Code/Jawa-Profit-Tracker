@@ -12,13 +12,14 @@
   <header class="topbar">
     <div class="topbar-inner">
       <div class="brand-block" role="button" tabindex="0" aria-label="Return to home" onclick="location.href='index.html'">
-        <div class="brand-title">Jawa Profit Tracker</div>
+        <div class="brand-mark">JP</div>
+        <div class="brand-title">Jawa Profit<span>Tracker</span></div>
       </div>
       <nav class="tabs" aria-label="Pages">
-        <a href="index.html">Home</a>
-        <a href="tracker.html">Log Item</a>
-        <a href="sheet.html" class="tab-btn active">Sheet</a>
-        <a href="guide.html">Guide</a>
+        <a href="index.html">Parts Bought</a>
+        <a href="sold.html">Parts Sold</a>
+        <a href="sheet.html" class="tab-btn active">Load Sheet</a>
+        <a href="expenses.html">Other Expenses</a>
       </nav>
     </div>
   </header>
@@ -27,15 +28,21 @@
     <section class="panel">
       <div class="eyebrow">Sheet &middot; Jawa Profit Tracker</div>
       <h1>Edit your profit sheet</h1>
-      <p>Load the sheet into memory, edit any cells you want, then push all changes to your Google Sheet at once with <b>Save all</b>. Nothing is written until you click Save all.</p>
+      <p>Load the sheet into memory, edit any cells you want, then push all changes to your Google Sheet at once with <b>Save all</b>.</p>
 
       <div id="sheetStatus" class="status hidden"></div>
+      <div style="display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap;">
+        <label style="font-size:0.8rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px;">Google Sheet ID</label>
+        <input id="sheetIdInput" type="text" placeholder="Enter Sheet ID (from URL)" style="flex:1; min-width:200px;">
+        <button id="setSheetIdBtn" class="secondary">Set Sheet</button>
+        <span id="sheetSource" style="color:var(--text-dim);font-size:0.85rem;"></span>
+      </div>
+
       <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
         <button id="saveAllBtn" class="primary">Save all to sheet</button>
         <button id="reloadBtn" class="secondary">Reload / discard</button>
         <button id="refreshBtn" class="secondary">Refresh</button>
         <span id="dirtyBadge" style="color:var(--warn);font-weight:700;margin-left:auto;"></span>
-        <span id="sheetSource" style="color:var(--text-dim);font-size:0.85rem;"></span>
       </div>
 
       <div id="sheetEmpty" class="panel" style="text-align:center;display:none;">
@@ -67,46 +74,80 @@
       </div>
     </section>
   </main>
+
   <footer id="siteFooter" class="panel">
     <h2>Jawa Profit Tracker</h2>
     <p>Track items you bought, organize them into PCs, sell individually &mdash; profit tracked per row, synced to Google Sheets.</p>
     <nav class="footer-links" aria-label="Footer navigation">
-      <a href="index.html">Home</a>
-      <a href="tracker.html">Log Item</a>
-      <a href="sheet.html">Sheet</a>
-      <a href="guide.html">Guide</a>
+      <a href="index.html">Parts Bought</a>
+      <a href="sold.html">Parts Sold</a>
+      <a href="sheet.html">Load Sheet</a>
+      <a href="expenses.html">Other Expenses</a>
     </nav>
   </footer>
 
   <div id="toast-container"></div>
   <script defer src="assets/js/app.js"></script>
-  <script defer>
-    (() => {
-      const tableBody = $('#sheetBody');
-      const sheetWrap = $('#sheetWrap');
-      const sheetEmpty = $('#sheetEmpty');
-      const sheetStatus = $('#sheetStatus');
-      const saveAllBtn = $('#saveAllBtn');
-      const reloadBtn = $('#reloadBtn');
-      const refreshBtn = $('#refreshBtn');
-      const dirtyBadge = $('#dirtyBadge');
-      const sheetSource = $('#sheetSource');
 
-      const EDITABLE = ['Item', 'Store', 'Total Cost', 'Qty PCs', 'Sell Price per PC', 'PCs Sold', 'Status', 'Notes'];
-      const COMPUTED = ['Cost per PC', 'PCs Remaining', 'Revenue', 'Profit'];
+      tableBody.addEventListener('input', (e) => {
+        const input = e.target;
+        if (!input.matches('input, select')) return;
+        const tr = input.closest('tr[data-id]');
+        if (!tr) return;
+        const id = tr.dataset.id;
+        const field = input.dataset.field;
+        const row = rows.find((r) => r.ID === id);
+        if (!row) return;
+        row[field] = input.value;
+        recomputeRow(row);
+        tr.querySelectorAll('td[data-field]').forEach((td) => {
+          const f = td.dataset.field;
+          if (COMPUTED.includes(f)) td.textContent = (f === 'Qty PCs' || f === 'PCs Sold' || f === 'PCs Remaining' ? statusQty(row[f]) : statusMoney(row[f]));
+        });
+        markDirty();
+      });
 
-      let originalRows = [];
-      let rows = [];
-      let loading = false;
-
-      function statusMoney(v) { return v === '' || v === undefined ? '&mdash;' : '&pound;' + Number(v).toFixed(2); }
-      function statusQty(v) { return v === '' || v === undefined ? '&mdash;' : Number(v); }
-      function escapeHtml(t) {
-        const d = document.createElement('div');
-        d.textContent = t === null || t === undefined ? '' : String(t);
-        return d.innerHTML;
+      async function getSheetId() {
+        const id = sheetIdInput.value.trim();
+        if (!id) {
+          try {
+            const res = await fetch(`${API_BASE}/sheet`, { cache: 'no-store' });
+            const data = await res.json().catch(() => ({}));
+            if (data.sheetId) sheetIdInput.value = data.sheetId;
+          } catch (e) {}
+        }
+        return sheetIdInput.value.trim();
       }
-      function isEqual(a, b) { return String(a === undefined ? '' : a) === String(b === undefined ? '' : b); }
+
+      async function setSheet() {
+        if (loading) return;
+        loading = true;
+        sheetStatus.className = 'status hidden';
+        try {
+          const id = await getSheetId();
+          if (!id) {
+            showToast('Please enter a Sheet ID.', 'warn');
+            return;
+          }
+          const res = await fetch(`${API_BASE}/sheet/sheet-id`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sheetId: id }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || data.ok === false) throw new Error(data.error || 'Failed to set sheet.');
+          sheetStatus.className = 'status ok';
+          sheetStatus.textContent = 'Sheet updated: ' + id;
+          showToast('Sheet updated.', 'ok');
+          await load();
+        } catch (err) {
+          sheetStatus.className = 'status error';
+          sheetStatus.textContent = err.message || 'Failed to set sheet.';
+          showToast(err.message || 'Failed to set sheet.', 'error');
+        } finally {
+          loading = false;
+        }
+      }
 
       function recomputeRow(r) {
         const qtyPcsN = Number(r['Qty PCs']) || 0;
@@ -128,103 +169,6 @@
         saveAllBtn.disabled = true;
         dirtyBadge.textContent = '';
       }
-      function render() {
-        if (!rows || rows.length === 0) {
-          sheetWrap.style.display = 'none';
-          sheetEmpty.style.display = '';
-          return;
-        }
-        sheetEmpty.style.display = 'none';
-        sheetWrap.style.display = '';
-        tableBody.innerHTML = rows.map((r) => {
-          const sold = statusQty(r['PCs Sold']);
-          const left = statusQty(r['PCs Remaining']);
-          const profit = statusMoney(r['Profit']);
-          const statusClass = 'status-' + String(r['Status'] || 'Active').replace(/\s+/g, '-');
-          return '<tr>' +
-            '<td>' + escapeHtml(r.Item) + '</td>' +
-            '<td>' + escapeHtml(r.Store) + '</td>' +
-            '<td>' + escapeHtml(r.Date) + '</td>' +
-            '<td class="money">' + statusMoney(r['Total Cost']) + '</td>' +
-            '<td class="qty">' + statusQty(r['Qty PCs']) + '</td>' +
-            '<td class="money">' + statusMoney(r['Cost per PC']) + '</td>' +
-            '<td class="money">' + statusMoney(r['Sell Price per PC']) + '</td>' +
-            '<td><input type="number" class="edit sold" min="0" step="1" data-id="' + escapeHtml(r.ID) + '" value="' + (sold === undefined ? '' : sold) + '"></td>' +
-            '<td class="qty">' + left + '</td>' +
-            '<td class="money">' + statusMoney(r['Revenue']) + '</td>' +
-            '<td class="money">' + profit + '</td>' +
-            '<td><select class="edit status" data-id="' + escapeHtml(r.ID) + '">' +
-            '<option value="Active"' + (r.Status === 'Active' ? ' selected' : '') + '>Active</option>' +
-            '<option value="Sold Out"' + (r.Status === 'Sold Out' ? ' selected' : '') + '>Sold Out</option>' +
-            '<option value="Inactive"' + (r.Status === 'Inactive' ? ' selected' : '') + '>Inactive</option>' +
-            '</select></td>' +
-            '<td><input type="text" class="edit notes" data-id="' + escapeHtml(r.ID) + '" value="' + escapeHtml(r.Notes) + '"></td>' +
-            '<td class="btn-cell"><button class="save-btn primary" data-id="' + escapeHtml(r.ID) + '">Save</button></td>' +
-            '</tr>';
-        }).join('');
-
-        tableBody.querySelectorAll('.save-btn').forEach((btn) => {
-          btn.addEventListener('click', (e) => {
-            const id = e.currentTarget.dataset.id;
-            const tr = e.currentTarget.closest('tr');
-            const sold = tr.querySelector('input.edit.sold');
-            const status = tr.querySelector('select.edit.status');
-            const notes = tr.querySelector('input.edit.notes');
-            saveRow(id, {
-              'PCs Sold': sold ? sold.value : undefined,
-              Status: status ? status.value : undefined,
-              Notes: notes ? notes.value : undefined,
-            });
-          });
-        });
-      }
-
-      async function saveRow(id, fields) {
-        if (loading) return;
-        loading = true;
-        sheetStatus.className = 'status hidden';
-        try {
-          const res = await fetch(`${API_BASE}/sheet/${encodeURIComponent(id)}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(fields),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok || data.ok === false) throw new Error(data.error || 'Save failed (HTTP ' + res.status + ')');
-          sheetStatus.className = 'status ok';
-          sheetStatus.textContent = 'Saved to sheet.';
-          showToast('Row saved.', 'ok');
-          await load();
-        } catch (err) {
-          sheetStatus.className = 'status error';
-          sheetStatus.textContent = err.message || 'Save failed.';
-          showToast(err.message || 'Save failed.', 'error');
-        } finally {
-          loading = false;
-        }
-      }
-
-      async function load() {
-        sheetStatus.className = 'status hidden';
-        try {
-          const res = await fetch(`${API_BASE}/sheet`, { cache: 'no-store' });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok || data.ok === false) throw new Error(data.error || 'Load failed (HTTP ' + res.status + ')');
-          rows = data.rows || [];
-          sheetSource.textContent = 'Source: ' + (data.headers ? data.headers.join(', ') : '');
-          render();
-        } catch (err) {
-          sheetStatus.className = 'status error';
-          sheetStatus.textContent = err.message || 'Could not load sheet.';
-          showToast(err.message || 'Could not load sheet.', 'error');
-          sheetWrap.style.display = 'none';
-          sheetEmpty.style.display = '';
-        }
-      }
-
-      refreshBtn.addEventListener('click', load);
-      load();
-    })();
 
       function render() {
         if (!rows || rows.length === 0) {
@@ -238,41 +182,6 @@
           return '<tr data-id="' + escapeHtml(r.ID) + '">' +
             EDITABLE.map((f) => {
               if (f === 'Status') {
-                return '<td data-field="Status"><select data-field="Status" data-id="' + escapeHtml(r.ID) + '">' +
-                  '<option value="Active"' + (r.Status === 'Active' ? ' selected' : '') + '>Active</option>' +
-                  '<option value="Sold Out"' + (r.Status === 'Sold Out' ? ' selected' : '') + '>Sold Out</option>' +
-                  '<option value="Inactive"' + (r.Status === 'Inactive' ? ' selected' : '') + '>Inactive</option>' +
-                  '</select></td>';
-              }
-              const inputType = ['Total Cost', 'Qty PCs', 'Sell Price per PC', 'PCs Sold'].includes(f) ? 'number' : 'text';
-              const extra = f === 'Qty PCs' || f === 'PCs Sold' ? 'min="0" step="1"' : (f === 'Total Cost' || f === 'Sell Price per PC') ? 'min="0" step="0.01"' : '';
-              return '<td data-field="' + f + '"><input type="' + inputType + '" ' + extra +
-                ' data-field="' + f + '" data-id="' + escapeHtml(r.ID) + '" value="' + escapeHtml(r[f] === undefined ? '' : r[f]) + '"></td>';
-            }).join('') +
-            COMPUTED.map((f) => '<td data-field="' + f + '" class="money">' +
-              (f === 'Qty PCs' || f === 'PCs Sold' || f === 'PCs Remaining' ? statusQty(r[f]) : statusMoney(r[f])) +
-              '</td>').join('') +
-            '</tr>';
-        }).join('');
-      }
-
-      tableBody.addEventListener('input', (e) => {
-        const input = e.target;
-        if (!input.matches('input, select')) return;
-        const tr = input.closest('tr[data-id]');
-        if (!tr) return;
-        const id = tr.dataset.id;
-        const field = input.dataset.field;
-        const row = rows.find((r) => r.ID === id);
-        if (!row) return;
-        row[field] = input.value;
-        recomputeRow(row);
-        tr.querySelectorAll('td[data-field]').forEach((td) => {
-          const f = td.dataset.field;
-          if (COMPUTED.includes(f)) td.textContent = (f === 'Qty PCs' || f === 'PCs Sold' || f === 'PCs Remaining' ? statusQty(row[f]) : statusMoney(row[f]));
-        });
-        markDirty();
-      });
 
       async function load() {
         sheetStatus.className = 'status hidden';
@@ -335,9 +244,42 @@
         }
       }
 
+      setSheetIdBtn.addEventListener('click', setSheet);
       saveAllBtn.addEventListener('click', saveAll);
       reloadBtn.addEventListener('click', load);
+      refreshBtn.addEventListener('click', load);
+      load();
+    })();
   </script>
 </body>
 </html>
-
+                return '<td data-field="Status"><select data-field="Status" data-id="' + escapeHtml(r.ID) + '">' +
+                  '<option value="Active"' + (r.Status === 'Active' ? ' selected' : '') + '>Active</option>' +
+                  '<option value="Sold Out"' + (r.Status === 'Sold Out' ? ' selected' : '') + '>Sold Out</option>' +
+                  '<option value="Inactive"' + (r.Status === 'Inactive' ? ' selected' : '') + '>Inactive</option>' +
+                  '</select></td>';
+              }
+              const inputType = ['Total Cost', 'Qty PCs', 'Sell Price per PC', 'PCs Sold'].includes(f) ? 'number' : 'text';
+              const extra = f === 'Qty PCs' || f === 'PCs Sold' ? 'min="0" step="1"' : (f === 'Total Cost' || f === 'Sell Price per PC') ? 'min="0" step="0.01"' : '';
+              return '<td data-field="' + f + '"><input type="' + inputType + '" ' + extra +
+                ' data-field="' + f + '" data-id="' + escapeHtml(r.ID) + '" value="' + escapeHtml(r[f] === undefined ? '' : r[f]) + '"></td>';
+            }).join('') +
+            COMPUTED.map((f) => '<td data-field="' + f + '" class="money">' +
+              (f === 'Qty PCs' || f === 'PCs Sold' || f === 'PCs Remaining' ? statusQty(r[f]) : statusMoney(r[f])) +
+              '</td>').join('') +
+            '</tr>';
+        }).join('');
+      }
+  <script defer>
+    (() => {
+      const tableBody = document.getElementById('sheetBody');
+      const sheetWrap = document.getElementById('sheetWrap');
+      const sheetEmpty = document.getElementById('sheetEmpty');
+      const sheetStatus = document.getElementById('sheetStatus');
+      const saveAllBtn = document.getElementById('saveAllBtn');
+      const reloadBtn = document.getElementById('reloadBtn');
+      const refreshBtn = document.getElementById('refreshBtn');
+      const dirtyBadge = document.getElementById('dirtyBadge');
+      const sheetSource = document.getElementById('sheetSource');
+      const sheetIdInput = document.getElementById('sheetIdInput');
+      const setSheetIdBtn = document.getElementById('setSheetIdBtn');

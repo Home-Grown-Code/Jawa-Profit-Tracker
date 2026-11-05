@@ -9,9 +9,10 @@ const { google } = require('googleapis');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const SHEET_ID = process.env.GOOGLE_SHEET_ID || '';
+const currentSheetId = process.env.GOOGLE_currentSheetId || '';
 const SHEET_NAME = process.env.SHEET_NAME || 'Jawa Profit';
 const SERVICE_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '';
+const currentSheetId = currentSheetId;
 
 const COLUMNS = [
   'ID', 'Date', 'Item', 'Store', 'Total Cost', 'Qty PCs', 'Cost per PC',
@@ -36,7 +37,7 @@ let sheetsAuth = null;
 
 function getSheetsAuth() {
   if (sheetsAuth) return sheetsAuth;
-  if (!SHEET_ID || !SERVICE_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
+  if (!currentSheetId || !SERVICE_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
     return null;
   }
   sheetsAuth = new google.auth.GoogleAuth({
@@ -67,11 +68,11 @@ async function readAllRows() {
   const client = sheetsClient();
   if (!client) {
     throw new Error(
-      'Backend not configured. Set GOOGLE_SHEET_ID, GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_PRIVATE_KEY.'
+      'Backend not configured. Set GOOGLE_currentSheetId, GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_PRIVATE_KEY.'
     );
   }
   const res = await client.spreadsheets.values.get({
-    spreadsheetId: SHEET_ID,
+    spreadsheetId: currentSheetId,
     range: rangeRef(SHEET_NAME),
   });
   const values = res.data.values || [];
@@ -94,7 +95,7 @@ async function appendRow(fields) {
   }
   const values = COLUMNS.map((c) => (fields[c] !== undefined ? fields[c] : ''));
   await client.spreadsheets.values.append({
-    spreadsheetId: SHEET_ID,
+    spreadsheetId: currentSheetId,
     range: rangeRef(SHEET_NAME, 'A:N'),
     valueInputOption: 'USER_ENTERED',
     insertDataOption: 'INSERT_ROWS',
@@ -123,7 +124,7 @@ async function updateRowById(id, fields) {
   });
   if (updates.length) {
     await client.spreadsheets.values.batchUpdate({
-      spreadsheetId: SHEET_ID,
+      spreadsheetId: currentSheetId,
       resource: { valueInputOption: 'USER_ENTERED', data: updates },
     });
   }
@@ -293,11 +294,24 @@ app.post('/api/sheet/batch', async (req, res, next) => {
 
     if (cellUpdates.length) {
       await sheetsClient().spreadsheets.values.batchUpdate({
-        spreadsheetId: SHEET_ID,
+        spreadsheetId: currentSheetId,
         resource: { valueInputOption: 'USER_ENTERED', data: cellUpdates },
       });
     }
     res.json({ ok: true, count: results.filter((r) => r.ok).length, results });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/api/sheet/sheet-id', async (req, res, next) => {
+  try {
+    const { sheetId } = req.body || {};
+    if (!sheetId || typeof sheetId !== 'string') {
+      return res.status(400).json({ ok: false, error: 'Sheet ID required.' });
+    }
+    currentSheetId = sheetId;
+    res.json({ ok: true, sheetId: currentSheetId });
   } catch (err) {
     next(err);
   }
