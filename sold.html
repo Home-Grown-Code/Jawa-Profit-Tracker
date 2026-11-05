@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Parts Sold | Jawa Profit Tracker</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/images/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand-block" role="button" tabindex="0" aria-label="Return to home" onclick="location.href='index.html'">
+        <div class="brand-mark">JP</div>
+        <div class="brand-title">Jawa Profit<span>Tracker</span></div>
+      </div>
+      <nav class="tabs" aria-label="Pages">
+        <a href="index.html">Parts Bought</a>
+        <a href="sold.html" class="tab-btn active">Parts Sold</a>
+        <a href="sheet.html">Load Sheet</a>
+        <a href="expenses.html">Other Expenses</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1><span class="j">J</span>awa Profit Tracker</h1>
+      <p>Track every piece you have sold and what it earned you. Profit is calculated per row and all changes push to your Google Sheet at once.</p>
+    </section>
+
+    <section class="panel">
+      <div class="eyebrow">Stats &middot; Parts Sold</div>
+      <h2>Sales summary</h2>
+      <div class="empty">
+        <span class="icon">&#128202;</span>
+        <p>No sales recorded yet.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="eyebrow">Data Table</div>
+      <h2>Sales log</h2>
+      <div id="soldStatus" class="status hidden"></div>
+      <div class="table-wrap" id="soldWrap" style="display:none;">
+        <table id="soldTable">
+          <thead>
+            <tr>
+              <th>Item</th><th>Store</th><th>Cost/PC</th><th>Sell/PC</th>
+              <th>PCs Sold</th><th>Revenue</th><th>Profit</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="soldBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer id="siteFooter" class="panel">
+    <h2>Jawa Profit Tracker</h2>
+    <p>Track items you bought, organize them into PCs, sell individually &mdash; profit tracked per row, synced to Google Sheets.</p>
+    <nav class="footer-links">
+      <a href="index.html">Parts Bought</a>
+      <a href="sold.html">Parts Sold</a>
+      <a href="sheet.html">Load Sheet</a>
+      <a href="expenses.html">Other Expenses</a>
+    </nav>
+  </footer>
+
+  <div id="toast-container"></div>
+  <script defer src="assets/js/app.js"></script>
+  <script defer>
+    (() => {
+      const body = document.getElementById('soldBody')
+      const wrap = document.getElementById('soldWrap')
+      const status = document.getElementById('soldStatus')
+      const fetchUrl = API_BASE ? '(' + API_BASE + '/sheet) : \'/api/sheet\'
+      let rows = []
+      let loading = false
+      async function load() {
+        if (loading) return
+        loading = true
+        status.className = 'status hidden'
+        try {
+          const res = await fetch(fetchUrl, { cache: 'no-store' })
+          const data = await res.json().catch(() => ({}))
+          if (!res.ok || data.ok === false) throw new Error(data.error || 'Load failed')
+          rows = data.rows || []
+          render()
+        } catch (err) {
+          status.className = 'status error'
+          status.textContent = err.message || 'Could not load sold items.'
+          showToast(err.message || 'Could not load sold items.', 'error')
+        } finally {
+          loading = false
+        }
+      }
+      function render() {
+        if (!rows || rows.length === 0) {
+          wrap.style.display = 'none'
+          document.querySelector('.empty').style.display = 'block'
+          return
+        }
+        wrap.style.display = 'block'
+        document.querySelector('.empty').style.display = 'none'
+        body.innerHTML = rows.map(r => {
+          const sold = Number(r['PCs Sold']) || 0
+          const revenue = Number(r['Revenue']) || 0
+          const profit = Number(r['Profit']) || 0
+          const statusClass = 'status-' + (r.Status || 'Active').replace(/\s+/g, '-')
+          return '<tr>' +
+            '<td>' + escapeHtml(r.Item) + '</td>' +
+            '<td>' + escapeHtml(r.Store) + '</td>' +
+            '<td class="money">' + (r['Cost per PC'] || '0.00') + '</td>' +
+            '<td class="money">' + (r['Sell Price per PC'] || '0.00') + '</td>' +
+            '<td class="money">' + sold + '</td>' +
+            '<td class="money">' + revenue + '</td>' +
+            '<td class="money">' + profit + '</td>' +
+            '<td><span class="status-pill ' + statusClass + '">' + (r.Status || 'Active') + '</span></td>' +
+            '<td class="btn-cell"><button class="primary" onclick="window.location.href=\'sheet.html\'">Edit all &rarr;</button></td>' +
+          '</tr>'
+        }).join('')
+      }
+      function escapeHtml(t) {
+        const d = document.createElement('div')
+        d.textContent = t === null || t === undefined ? '' : String(t)
+        return d.innerHTML
+      }
+      load()
+    })()
+  </script>
+</body>
+</html>

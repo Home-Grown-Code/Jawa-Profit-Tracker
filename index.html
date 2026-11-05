@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Jawa Profit Tracker</title>
+  <title>Parts Bought | Jawa Profit Tracker</title>
   <link rel="stylesheet" href="assets/css/styles.css">
   <link rel="icon" type="image/png" sizes="192x192" href="assets/images/icon-192.png">
   <link rel="manifest" href="/manifest.webmanifest">
@@ -12,37 +12,69 @@
   <header class="topbar">
     <div class="topbar-inner">
       <div class="brand-block" role="button" tabindex="0" aria-label="Return to home" onclick="location.href='index.html'">
-        <div class="brand-title">Jawa Profit Tracker</div>
+        <div class="brand-mark">JP</div>
+        <div class="brand-title">Jawa Profit<span>Tracker</span></div>
       </div>
       <nav class="tabs" aria-label="Pages">
-        <a href="index.html" class="tab-btn active">Home</a>
-        <a href="tracker.html">Log Item</a>
-        <a href="sheet.html">Sheet</a>
-        <a href="guide.html">Guide</a>
+        <a href="index.html" class="tab-btn active">Parts Bought</a>
+        <a href="sold.html">Parts Sold</a>
+        <a href="sheet.html">Load Sheet</a>
+        <a href="expenses.html">Other Expenses</a>
       </nav>
     </div>
   </header>
 
   <main>
-    <section class="panel welcome-panel">
-      <div class="eyebrow">Jawa Profit Tracker &middot; Personal</div>
-      <h1>Track what you bought. Sell it piece by piece.</h1>
-      <p>Log each purchase, record how many PCs (pieces) you got, then track every individual sale. Profit is worked out automatically and synced to your Google Sheet.</p>
-      <div style="margin-top:14px;">
-        <a href="tracker.html" class="primary">Log a bought item &rarr;</a>
-        <a href="sheet.html" class="secondary" style="margin-left:8px;">Edit sheet &rarr;</a>
+    <section class="hero">
+      <h1><span class="j">J</span>awa Profit Tracker</h1>
+      <p>Log every item you bought, track the pieces (PCs) inside it, and watch your profits grow as you sell individually.</p>
+      <div class="hero-actions">
+        <a href="tracker.html" class="primary">+ Log a new item &rarr;</a>
+        <a href="sheet.html" class="secondary">Open Sheet &rarr;</a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="eyebrow">Categories</div>
+      <h2>What is there to buy?</h2>
+      <p>Track purchases in one of four ways. All entries sync to your Google Sheet automatically and you can edit them in RAM at any time.</p>
+      <div class="category-grid">
+        <div class="category-card">
+          <div class="icon">&#9881;</div>
+          <h3>Bought PC</h3>
+          <p>A whole prebuilt machine. Log the full cost, then record how many components (PCs) inside it you are selling one by one.</p>
+          <a href="tracker.html" class="btn primary">Log Bought PC &rarr;</a>
+        </div>
+        <div class="category-card">
+          <div class="icon">&#9888;</div>
+          <h3>Bought Part</h3>
+          <p>A single component like a graphics card, CPU, or motherboard. Cheaper to log and easier to sell piece by piece.</p>
+          <a href="tracker.html" class="btn secondary">Log Bought Part &rarr;</a>
+        </div>
+        <div class="category-card">
+          <div class="icon">&#9432;</div>
+          <h3>New</h3>
+          <p>Brand-new stock from a supplier or retailer. No previous owner, no used markup. The cleanest starting point for your portfolio.</p>
+          <a href="tracker.html" class="btn secondary">Log New &rarr;</a>
+        </div>
+        <div class="category-card">
+          <div class="icon">&#128222;</div>
+          <h3>Other Expenses</h3>
+          <p>Fees, shipping, taxes, or anything that eats into your profit but is not a physical part. Track it so the math stays honest.</p>
+          <a href="expenses.html" class="btn ghost">Open Other Expenses &rarr;</a>
+        </div>
       </div>
     </section>
   </main>
 
   <footer id="siteFooter" class="panel">
     <h2>Jawa Profit Tracker</h2>
-    <p>Personal profit tracker &mdash; PCs and individual sales, synced to Google Sheets.</p>
+    <p>Track items you bought, organize them into PCs, sell individually &mdash; profit tracked per row, synced to Google Sheets.</p>
     <nav class="footer-links" aria-label="Footer navigation">
-      <a href="index.html">Home</a>
-      <a href="tracker.html">Log Item</a>
-      <a href="sheet.html">Sheet</a>
-      <a href="guide.html">Guide</a>
+      <a href="index.html">Parts Bought</a>
+      <a href="sold.html">Parts Sold</a>
+      <a href="sheet.html">Load Sheet</a>
+      <a href="expenses.html">Other Expenses</a>
     </nav>
   </footer>
 
